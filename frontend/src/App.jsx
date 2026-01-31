@@ -1,34 +1,75 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+
+
+import ArmyListPage from './pages/armyList';
+import BattleReportPage from './pages/battleReport';
+import CodexPage from './pages/codex';
+import LoginPage from './pages/LoginPage';
+import ProfilePage from './pages/ProfilePage';
+import { useState, useEffect } from 'react';
+import NavButton from './components/NavButton';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [page, setPage] = useState('army');
+  const [globalError, setGlobalError] = useState('');
+  const [username, setUsername] = useState(() => localStorage.getItem('wh_username') || '');
+  const [route, setRoute] = useState('main'); // 'main', 'login', 'profile'
 
+  // Propager setGlobalError aux pages pour afficher les erreurs API
+  const pageProps = { setGlobalError };
+
+  // Login handler
+  const handleLogin = (name) => {
+    setUsername(name);
+    localStorage.setItem('wh_username', name);
+    setRoute('main');
+  };
+  const handleLogout = () => {
+    setUsername('');
+    localStorage.removeItem('wh_username');
+    setRoute('login');
+  };
+
+  useEffect(() => {
+    // Pour garder le nom à jour si modifié ailleurs
+    const sync = () => setUsername(localStorage.getItem('wh_username') || '');
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
+
+  // Affichage de la navbar
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{ minHeight: '100vh', width: '100vw', background: '#18181b', color: '#f3f3f3', margin: 0, padding: 0, boxSizing: 'border-box' }}>
+      <nav style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: '#27272a', borderBottom: '1px solid #333', width: '100%' }}>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <NavButton active={page==='army' && route==='main'} onClick={()=>{setPage('army');setRoute('main')}}>Listes d'Armées</NavButton>
+          <NavButton active={page==='battle' && route==='main'} onClick={()=>{setPage('battle');setRoute('main')}}>Rapports de Batailles</NavButton>
+          <NavButton active={page==='codex' && route==='main'} onClick={()=>{setPage('codex');setRoute('main')}}>Codex</NavButton>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {username ? (
+            <>
+              <span style={{ fontWeight: 'bold', marginRight: 8, cursor: 'pointer' }} onClick={()=>setRoute('profile')}>👤 {username}</span>
+              <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Déconnexion</button>
+            </>
+          ) : (
+            <button onClick={()=>setRoute('login')} style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 18px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem' }}>Login</button>
+          )}
+        </div>
+      </nav>
+      {globalError && <div style={{ background: '#3f1d1d', color: '#ffb4b4', padding: 12, margin: 0, border: '1px solid #a00', borderRadius: 4 }}>{globalError}</div>}
+      <main style={{ padding: 16, width: '100%', boxSizing: 'border-box' }}>
+        {route === 'login' && <LoginPage onLogin={handleLogin} />}
+        {route === 'profile' && <ProfilePage username={username} onLogout={handleLogout} />}
+        {route === 'main' && (
+          <>
+            {page === 'army' && <ArmyListPage {...pageProps} username={username} />}
+            {page === 'battle' && <BattleReportPage {...pageProps} username={username} />}
+            {page === 'codex' && <CodexPage {...pageProps} username={username} />}
+          </>
+        )}
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
