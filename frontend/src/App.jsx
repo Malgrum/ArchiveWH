@@ -7,6 +7,7 @@ import ProfilePage from './pages/ProfilePage';
 import { useState, useEffect } from 'react';
 import NavButton from './components/NavButton';
 import HomePage from './pages/HomePage';
+import RulesPage from './pages/RulesPage';
 
 function App() {
   const [page, setPage] = useState('home');
@@ -68,6 +69,7 @@ function App() {
       <nav style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: '#27272a', borderBottom: '1px solid #333', width: '100%' }}>
         <div style={{ display: 'flex', gap: 16 }}>
           <NavButton active={page==='home' && route==='main'} onClick={()=>{setPage('home');setRoute('main')}}>Accueil</NavButton>
+          <NavButton active={page==='rules' && route==='main'} onClick={()=>{setPage('rules');setRoute('main')}}>Règles</NavButton>
           <NavButton active={page==='army' && route==='main'} onClick={()=>{setPage('army');setRoute('main')}}>Listes d'Armées</NavButton>
           <NavButton active={page==='battle' && route==='main'} onClick={()=>{setPage('battle');setRoute('main')}}>Rapports de Batailles</NavButton>
           <NavButton active={page==='codex' && route==='main'} onClick={()=>{setPage('codex');setRoute('main')}}>Codex</NavButton>
@@ -90,6 +92,7 @@ function App() {
         {route === 'main' && (
           <>
             {page === 'home' && <HomePage user={user} />}
+            {page === 'rules' && <RulesPage />}
             {page === 'army' && <ArmyListPage {...pageProps} />}
             {page === 'battle' && <BattleReportPage {...pageProps} />}
             {page === 'codex' && <CodexPage {...pageProps} />}

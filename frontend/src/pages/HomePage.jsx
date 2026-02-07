@@ -11,7 +11,10 @@ const HomePage = ({ user }) => {
     try {
       setLoading(true);
       const res = await fetch('http://localhost:4000/api/news');
-      if (!res.ok) throw new Error('Erreur chargement actualités');
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || 'Erreur chargement actualités');
+      }
       const data = await res.json();
       setNews(data);
     } catch (err) {
@@ -34,7 +37,10 @@ const HomePage = ({ user }) => {
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id },
         body: JSON.stringify({ title: formData.title.trim(), content: formData.content.trim() })
       });
-      if (!res.ok) throw new Error('Erreur création actualité');
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || 'Erreur création actualité');
+      }
       setFormData({ title: '', content: '' });
       await fetchNews();
     } catch (err) {
