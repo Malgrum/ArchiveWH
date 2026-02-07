@@ -4,7 +4,7 @@ const UNIVERSES = [
     { key: 'aos', label: 'Age of Sigmar' },
 ];
 
-const BattleReportPage = ({ username }) => {
+const BattleReportPage = ({ user }) => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -20,25 +20,25 @@ const BattleReportPage = ({ username }) => {
     });
     const [users, setUsers] = useState([]);
     const [armyLists, setArmyLists] = useState([]);
-    const [myUserId, setMyUserId] = useState(null);
+    const myUserId = user?.id || null;
+    const isLoggedIn = !!user;
+    const [editingId, setEditingId] = useState(null);
+    const [editData, setEditData] = useState({ title: '', content: '' });
 
     useEffect(() => {
         fetchReports();
-        fetchUsers();
-    }, []);
+        if (isLoggedIn) fetchUsers();
+    }, [isLoggedIn]);
 
     // Fetch all users for opponent selection
     const fetchUsers = async () => {
         try {
-            const res = await fetch('http://localhost:4000/api/users');
+            const res = await fetch('http://localhost:4000/api/users', {
+                headers: { 'x-user-id': myUserId }
+            });
             if (!res.ok) throw new Error('Erreur chargement utilisateurs');
             const data = await res.json();
             setUsers(data);
-            // Find my user id
-            if (username) {
-                const me = data.find(u => u.username === username);
-                if (me) setMyUserId(me.id);
-            }
         } catch (e) {
             setError(e.message);
         }
@@ -69,7 +69,9 @@ const BattleReportPage = ({ username }) => {
 
     const fetchArmyListsForUser = async (userId, universe) => {
         try {
-            const res = await fetch(`http://localhost:4000/api/army-lists/user/${userId}`);
+            const res = await fetch(`http://localhost:4000/api/army-lists/user/${userId}`, {
+                headers: { 'x-user-id': myUserId }
+            });
             if (!res.ok) throw new Error('Erreur chargement listes');
             let data = await res.json();
             // Filter by universe if possible (assume faction contains universe info)
@@ -83,6 +85,7 @@ const BattleReportPage = ({ username }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            if (!myUserId) throw new Error('Connexion requise');
             const payload = {
                 user_id: myUserId,
                 title: formData.title,
@@ -95,7 +98,7 @@ const BattleReportPage = ({ username }) => {
             };
             const response = await fetch('http://localhost:4000/api/battle-reports', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-user-id': myUserId },
                 body: JSON.stringify(payload)
             });
             if (!response.ok) throw new Error('Failed to create report');
@@ -112,6 +115,45 @@ const BattleReportPage = ({ username }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const startEdit = (report) => {
+        setEditingId(report.id);
+        setEditData({ title: report.title || '', content: report.content || '' });
+    };
+
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditData({ title: '', content: '' });
+    };
+
+    const saveEdit = async (reportId) => {
+        try {
+            const response = await fetch(`http://localhost:4000/api/battle-reports/${reportId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-user-id': myUserId },
+                body: JSON.stringify({ title: editData.title, content: editData.content })
+            });
+            if (!response.ok) throw new Error('Failed to update report');
+            cancelEdit();
+            await fetchReports();
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const deleteReport = async (reportId) => {
+        if (!window.confirm('Supprimer ce rapport ?')) return;
+        try {
+            const response = await fetch(`http://localhost:4000/api/battle-reports/${reportId}`, {
+                method: 'DELETE',
+                headers: { 'x-user-id': myUserId }
+            });
+            if (!response.ok) throw new Error('Failed to delete report');
+            await fetchReports();
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
     if (loading) return <div>Loading...</div>;
 
     return (
@@ -119,9 +161,13 @@ const BattleReportPage = ({ username }) => {
             <h1>Rapports de Batailles</h1>
             {error && <div style={{ color: 'red' }}>{error}</div>}
 
-            <button onClick={() => setShowForm(!showForm)} style={{ marginBottom: '20px', padding: '10px 20px' }}>
-                {showForm ? 'Annuler' : 'Nouveau Rapport'}
-            </button>
+            {isLoggedIn ? (
+                <button onClick={() => setShowForm(!showForm)} style={{ marginBottom: '20px', padding: '10px 20px' }}>
+                    {showForm ? 'Annuler' : 'Nouveau Rapport'}
+                </button>
+            ) : (
+                <div style={{ marginBottom: 20, color: '#f87171' }}>Connectez-vous pour créer un rapport.</div>
+            )}
 
             {showForm && (
                 <form onSubmit={handleSubmit} style={{ marginBottom: '30px', border: '1px solid #ccc', padding: '20px' }}>
@@ -229,14 +275,45 @@ const BattleReportPage = ({ username }) => {
                 {reports.length === 0 ? (
                     <p>Aucun rapport créé.</p>
                 ) : (
-                    reports.map(report => (
-                        <div key={report.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
-                            <h3>{report.title}</h3>
-                            <p><strong>Auteur:</strong> {report.author}</p>
-                            <p><strong>Date:</strong> {new Date(report.created_at).toLocaleDateString()}</p>
-                            <p>{report.content}</p>
-                        </div>
-                    ))
+                    reports.map(report => {
+                        const canEdit = !!user && (user.is_admin || report.user_id === myUserId);
+                        return (
+                            <div key={report.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
+                                {editingId === report.id ? (
+                                    <div style={{ marginBottom: 12 }}>
+                                        <input
+                                            type="text"
+                                            value={editData.title}
+                                            onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                                            style={{ display: 'block', marginBottom: '10px', padding: '8px', width: '100%' }}
+                                        />
+                                        <textarea
+                                            value={editData.content}
+                                            onChange={(e) => setEditData(prev => ({ ...prev, content: e.target.value }))}
+                                            style={{ display: 'block', marginBottom: '10px', padding: '8px', width: '100%', minHeight: '160px' }}
+                                        />
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <button onClick={() => saveEdit(report.id)} style={{ padding: '8px 12px' }}>Enregistrer</button>
+                                            <button onClick={cancelEdit} style={{ padding: '8px 12px' }}>Annuler</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h3>{report.title}</h3>
+                                        <p><strong>Auteur:</strong> {report.author}</p>
+                                        <p><strong>Date:</strong> {new Date(report.created_at).toLocaleDateString()}</p>
+                                        <p>{report.content}</p>
+                                    </>
+                                )}
+                                {canEdit && editingId !== report.id && (
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                                        <button onClick={() => startEdit(report)} style={{ padding: '6px 10px' }}>Modifier</button>
+                                        <button onClick={() => deleteReport(report.id)} style={{ padding: '6px 10px', color: '#f87171' }}>Supprimer</button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
                 )}
             </div>
         </div>

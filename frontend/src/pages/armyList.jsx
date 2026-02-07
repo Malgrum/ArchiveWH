@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-const ArmyListPage = ({ username }) => {
-    if (!username) {
+const ArmyListPage = ({ user }) => {
+    if (!user) {
         return (
             <div style={{ padding: '20px', color: '#f87171', textAlign: 'center' }}>
                 <h1>Listes d'Armées</h1>
@@ -35,26 +35,7 @@ const ArmyListPage = ({ username }) => {
         content: ''
     });
     const [codexUnits, setCodexUnits] = useState([]);
-    const [userId, setUserId] = useState(null);
-    const [users, setUsers] = useState([]);
-
-    // Fetch all users to get the current user's id
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
-        try {
-            const res = await fetch('http://localhost:4000/api/users');
-            if (!res.ok) throw new Error('Erreur chargement utilisateurs');
-            const data = await res.json();
-            setUsers(data);
-            const me = data.find(u => u.username === username);
-            if (me) setUserId(me.id);
-        } catch (e) {
-            setError(e.message);
-        }
-    };
+    const userId = user?.id;
 
     useEffect(() => {
         if (userId) fetchArmyLists();
@@ -63,7 +44,9 @@ const ArmyListPage = ({ username }) => {
     const fetchArmyLists = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`http://localhost:4000/api/army-lists/user/${userId}`);
+            const response = await fetch(`http://localhost:4000/api/army-lists/user/${userId}`, {
+                headers: { 'x-user-id': userId }
+            });
             if (!response.ok) throw new Error('Failed to fetch army lists');
             const data = await response.json();
             setArmyLists(data);
@@ -89,7 +72,7 @@ const ArmyListPage = ({ username }) => {
             };
             const response = await fetch('http://localhost:4000/api/army-lists', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
                 body: JSON.stringify(payload)
             });
             if (!response.ok) throw new Error('Failed to create army list');

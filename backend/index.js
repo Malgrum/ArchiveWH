@@ -8,6 +8,7 @@ const armyRoutes = require('./routes/armyLists');
 const battleRoutes = require('./routes/battleReports');
 const codexRoutes = require('./routes/codex');
 const usersRoutes = require('./routes/users');
+const newsRoutes = require('./routes/news');
 
 const app = express();
 app.use(cors());
@@ -18,6 +19,7 @@ app.use('/api/army-lists', armyRoutes);
 app.use('/api/battle-reports', battleRoutes);
 app.use('/api/codex', codexRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/news', newsRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
