@@ -6,7 +6,7 @@ const { requireAdmin } = require('../auth');
 // Get codex entries
 router.get('/', async (req, res) => {
   try {
-    const { universe, mode, faction } = req.query;
+    const { universe, mode, faction, unit_type } = req.query;
     const filters = [];
     const params = [];
 
@@ -22,11 +22,15 @@ router.get('/', async (req, res) => {
       filters.push('faction = ?');
       params.push(faction);
     }
+    if (unit_type) {
+      filters.push('unit_type = ?');
+      params.push(unit_type);
+    }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
 
     const [rows] = await db.query(
-      `SELECT id, title, universe, mode, faction,
+      `SELECT id, title, universe, mode, faction, unit_type,
         range_weapons, melee_weapons,
         range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,
         melee_weapon, melee_bonus, melee_attacks, melee_strength, melee_ap, melee_damage,
@@ -46,7 +50,7 @@ router.post('/', requireAdmin, async (req, res) => {
   try {
     const {
       title,
-      universe, mode, faction,
+      universe, mode, faction, unit_type,
       range_weapons, melee_weapons,
       range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,
       melee_weapon, melee_bonus, melee_attacks, melee_strength, melee_ap, melee_damage,
@@ -58,14 +62,14 @@ router.post('/', requireAdmin, async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO codex (
-        admin_user_id, title, universe, mode, faction,
+        admin_user_id, title, universe, mode, faction, unit_type,
         range_weapons, melee_weapons,
         range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,
         melee_weapon, melee_bonus, melee_attacks, melee_strength, melee_ap, melee_damage,
         abilitie, points, keywords
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
       [
-        req.requester.id, title, universe, mode, faction,
+        req.requester.id, title, universe, mode, faction, unit_type || 'other',
         rangeWeaponsJson, meleeWeaponsJson,
         range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,
         melee_weapon, melee_bonus, melee_attacks, melee_strength, melee_ap, melee_damage,
@@ -83,7 +87,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const {
       title,
-      universe, mode, faction,
+      universe, mode, faction, unit_type,
       range_weapons, melee_weapons,
       range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,
       melee_weapon, melee_bonus, melee_attacks, melee_strength, melee_ap, melee_damage,
@@ -96,7 +100,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     await db.query(
       `UPDATE codex SET
         title = ?,
-        universe = ?, mode = ?, faction = ?,
+        universe = ?, mode = ?, faction = ?, unit_type = ?,
         range_weapons = ?,
         melee_weapons = ?,
         range_weapon = ?, range_bonus = ?, range_range = ?, range_attacks = ?, range_strength = ?, range_ap = ?, range_damage = ?,
@@ -105,7 +109,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
        WHERE id = ?`,
       [
         title,
-        universe, mode, faction,
+        universe, mode, faction, unit_type || 'other',
         rangeWeaponsJson,
         meleeWeaponsJson,
         range_weapon, range_bonus, range_range, range_attacks, range_strength, range_ap, range_damage,

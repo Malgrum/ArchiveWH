@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS codex (
   universe VARCHAR(32),
   mode VARCHAR(32),
   faction VARCHAR(100),
+  unit_type VARCHAR(32) DEFAULT 'other',
   range_weapons JSON,
   melee_weapons JSON,
   range_weapon VARCHAR(255),
@@ -70,7 +71,6 @@ CREATE TABLE IF NOT EXISTS news (
   FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Compte admin test
 INSERT INTO users (username, password_hash, is_admin)
 VALUES ('admin', 'admin123', 1)
 ON DUPLICATE KEY UPDATE
