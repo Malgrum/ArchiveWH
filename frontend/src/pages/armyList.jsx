@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 const ArmyListPage = ({ user }) => {
     if (!user) {
@@ -36,6 +36,20 @@ const ArmyListPage = ({ user }) => {
     });
     const [codexUnits, setCodexUnits] = useState([]);
     const userId = user?.id;
+
+    const pointsByUnitTitle = useMemo(() => {
+        const map = {};
+        codexUnits.forEach(unit => {
+            map[unit.title] = Number(unit.points) || 0;
+        });
+        return map;
+    }, [codexUnits]);
+
+    const selectedUnitsPoints = useMemo(() => {
+        return (formData.units || []).reduce((total, unitTitle) => {
+            return total + (pointsByUnitTitle[unitTitle] || 0);
+        }, 0);
+    }, [formData.units, pointsByUnitTitle]);
 
     useEffect(() => {
         if (userId) fetchArmyLists();
@@ -115,15 +129,22 @@ const ArmyListPage = ({ user }) => {
         const fetchCodex = async () => {
             if (formData.faction && formData.mode) {
                 try {
-                    const res = await fetch(`http://localhost:4000/api/codex?faction=${encodeURIComponent(formData.faction)}&mode=${encodeURIComponent(formData.mode)}`);
+                    const res = await fetch(`http://localhost:4000/api/codex?universe=${encodeURIComponent(formData.mode)}&faction=${encodeURIComponent(formData.faction)}`);
                     if (!res.ok) throw new Error('Erreur chargement codex');
                     const data = await res.json();
                     setCodexUnits(data);
+                    // Garde uniquement les unites encore valides pour l'univers/faction choisis.
+                    setFormData(prev => ({
+                        ...prev,
+                        units: (prev.units || []).filter(unitTitle => data.some(unit => unit.title === unitTitle))
+                    }));
                 } catch (e) {
                     setCodexUnits([]);
+                    setFormData(prev => ({ ...prev, units: [] }));
                 }
             } else {
                 setCodexUnits([]);
+                setFormData(prev => ({ ...prev, units: [] }));
             }
         };
         fetchCodex();
@@ -142,8 +163,8 @@ const ArmyListPage = ({ user }) => {
 
             {showForm && (
                 <form onSubmit={handleSubmit} style={{ marginBottom: '30px', border: '1px solid #ccc', padding: '20px' }}>
-                    {/* Mode de jeu */}
-                    <label style={{ display: 'block', marginBottom: 8 }}>Mode de jeu</label>
+                    {/* Univers */}
+                    <label style={{ display: 'block', marginBottom: 8 }}>Univers</label>
                     <select
                         name="mode"
                         value={formData.mode}
@@ -151,7 +172,7 @@ const ArmyListPage = ({ user }) => {
                         required
                         style={{ display: 'block', marginBottom: '10px', padding: '8px', width: '100%' }}
                     >
-                        <option value="">-- Choisir le mode --</option>
+                        <option value="">-- Choisir l'univers --</option>
                         {MODES.map(m => (
                             <option key={m.key} value={m.key}>{m.label}</option>
                         ))}
@@ -203,11 +224,23 @@ const ArmyListPage = ({ user }) => {
                                         value={unit.title}
                                         checked={formData.units.includes(unit.title)}
                                         onChange={handleInputChange}
-                                    /> {unit.title}
+                                    /> {unit.title} ({Number(unit.points) || 0} pts)
                                 </label>
                             ))}
                         </div>
                     )}
+                    {formData.mode && formData.faction && codexUnits.length === 0 && (
+                        <div style={{ marginBottom: 16, color: '#fbbf24' }}>
+                            Aucune unite trouvee pour cet univers et cette faction.
+                        </div>
+                    )}
+
+                    <div style={{ marginBottom: 16, padding: '10px 12px', border: '1px solid #666', borderRadius: 6 }}>
+                        <strong>Points selectionnes:</strong>{' '}
+                        {!['killteam', 'warcry'].includes(formData.mode)
+                            ? `${selectedUnitsPoints}/${formData.points ? Number(formData.points) : 0}`
+                            : `${selectedUnitsPoints}`}
+                    </div>
 
                     {/* Nom de la liste */}
                     <input
