@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 const UNIVERSES = [
     { key: '40k', label: 'Warhammer 40,000' },
     { key: 'aos', label: 'Age of Sigmar' },
@@ -24,6 +24,25 @@ const BattleReportPage = ({ user }) => {
     const isLoggedIn = !!user;
     const [editingId, setEditingId] = useState(null);
     const [editData, setEditData] = useState({ title: '', content: '' });
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredReports = useMemo(() => {
+        const query = searchTerm.trim().toLowerCase();
+        if (!query) return reports;
+
+        return reports.filter(report => {
+            const haystack = [
+                report.title,
+                report.content,
+                report.author,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(query);
+        });
+    }, [reports, searchTerm]);
 
     useEffect(() => {
         fetchReports();
@@ -271,11 +290,21 @@ const BattleReportPage = ({ user }) => {
                 </form>
             )}
 
+            <div style={{ marginBottom: 20 }}>
+                <input
+                    type="text"
+                    placeholder="Rechercher une bataille (titre, auteur, contenu)..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ display: 'block', padding: '10px', width: '100%', maxWidth: 640 }}
+                />
+            </div>
+
             <div>
-                {reports.length === 0 ? (
+                {filteredReports.length === 0 ? (
                     <p>Aucun rapport créé.</p>
                 ) : (
-                    reports.map(report => {
+                    filteredReports.map(report => {
                         const canEdit = !!user && (user.is_admin || report.user_id === myUserId);
                         return (
                             <div key={report.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 const UNIVERSES = [
     { key: '40k', label: 'Warhammer 40,000' },
     { key: 'aos', label: 'Age of Sigmar' },
@@ -18,8 +18,10 @@ function CodexPage({ user }) {
     const [mode, setMode] = useState(() => localStorage.getItem('codex_mode') || '');
     const [faction, setFaction] = useState(() => localStorage.getItem('codex_faction') || '');
     const [entries, setEntries] = useState([]);
+    const [allEntries, setAllEntries] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
     const isAdmin = !!user?.is_admin;
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -60,6 +62,21 @@ function CodexPage({ user }) {
         loadEntries();
     }, [step, universe, mode, faction]);
 
+    const loadAllEntries = async () => {
+        try {
+            const response = await fetch('http://localhost:4000/api/codex');
+            if (!response.ok) throw new Error('Erreur API codex globale');
+            const data = await response.json();
+            setAllEntries(data);
+        } catch (e) {
+            setError(e.toString());
+        }
+    };
+
+    useEffect(() => {
+        loadAllEntries();
+    }, []);
+
     const resetForm = () => {
         setFormData({
             title: '',
@@ -87,6 +104,31 @@ function CodexPage({ user }) {
             return fallback;
         }
     };
+
+    const filteredGlobalEntries = useMemo(() => {
+        const query = globalSearchTerm.trim().toLowerCase();
+        if (!query) return [];
+
+        return allEntries.filter(entry => {
+            const rangeWeapons = parseWeapons(entry.range_weapons, []).map(w => w?.name || '').join(' ');
+            const meleeWeapons = parseWeapons(entry.melee_weapons, []).map(w => w?.name || '').join(' ');
+            const haystack = [
+                entry.title,
+                entry.universe,
+                entry.mode,
+                entry.faction,
+                entry.abilitie,
+                entry.keywords,
+                rangeWeapons,
+                meleeWeapons,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(query);
+        });
+    }, [allEntries, globalSearchTerm]);
 
     const startEdit = (entry) => {
         setEditingId(entry.id);
@@ -528,6 +570,33 @@ function CodexPage({ user }) {
     return (
         <div style={{ padding: '20px' }}>
             <h1>Codex</h1>
+            <div style={{ marginBottom: 24, border: '1px solid #444', borderRadius: 6, padding: 12 }}>
+                <h2 style={{ marginTop: 0 }}>Recherche globale d'unite</h2>
+                <input
+                    type="text"
+                    placeholder="Tape un nom d'unite, faction, mot-cle..."
+                    value={globalSearchTerm}
+                    onChange={(e) => setGlobalSearchTerm(e.target.value)}
+                    style={{ display: 'block', marginBottom: 12, padding: '10px', width: '100%' }}
+                />
+
+                {globalSearchTerm.trim() !== '' && (
+                    filteredGlobalEntries.length === 0 ? (
+                        <p>Aucun resultat.</p>
+                    ) : (
+                        filteredGlobalEntries.map(entry => (
+                            <div key={`global-${entry.id}`} style={{ border: '1px solid #ddd', padding: '12px', marginBottom: '10px', borderRadius: '5px' }}>
+                                <h3 style={{ marginBottom: 6 }}>{entry.title}</h3>
+                                <p style={{ margin: '4px 0' }}>
+                                    <strong>Univers:</strong> {entry.universe} | <strong>Mode:</strong> {entry.mode} | <strong>Faction:</strong> {entry.faction}
+                                </p>
+                                {entry.abilitie && <p style={{ margin: '4px 0' }}><strong>Capacites:</strong> {entry.abilitie}</p>}
+                                {entry.keywords && <p style={{ margin: '4px 0' }}><strong>Mots-cles:</strong> {entry.keywords}</p>}
+                            </div>
+                        ))
+                    )
+                )}
+            </div>
             {content}
         </div>
     );
