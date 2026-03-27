@@ -7,6 +7,12 @@ const MODES = [
     { key: 'classique', label: 'Classique' },
     { key: 'killteam', label: 'Kill Team' },
 ];
+const UNIT_TYPES = [
+    { key: 'battleline', label: 'Battleline' },
+    { key: 'character', label: 'Character' },
+    { key: 'transport', label: 'Transport' },
+    { key: 'other', label: 'Other' },
+];
 const FACTIONS = {
     '40k': ['Space Marines', 'Astra Militarum', 'Orks', 'Tyranids'],
     'aos': ['Stormcast', 'Nighthaunt', 'Orruks', 'Sylvaneth'],
@@ -22,11 +28,13 @@ function CodexPage({ user }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+    const [unitTypeFilter, setUnitTypeFilter] = useState('all');
     const isAdmin = !!user?.is_admin;
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
+        unit_type: 'other',
         range_weapons: [
             { name: '', bonus: '', range: '', attacks: '', strength: '', ap: '', damage: '' }
         ],
@@ -80,6 +88,7 @@ function CodexPage({ user }) {
     const resetForm = () => {
         setFormData({
             title: '',
+            unit_type: 'other',
             range_weapons: [
                 { name: '', bonus: '', range: '', attacks: '', strength: '', ap: '', damage: '' }
             ],
@@ -110,6 +119,9 @@ function CodexPage({ user }) {
         if (!query) return [];
 
         return allEntries.filter(entry => {
+            if (unitTypeFilter !== 'all' && (entry.unit_type || 'other') !== unitTypeFilter) {
+                return false;
+            }
             const rangeWeapons = parseWeapons(entry.range_weapons, []).map(w => w?.name || '').join(' ');
             const meleeWeapons = parseWeapons(entry.melee_weapons, []).map(w => w?.name || '').join(' ');
             const haystack = [
@@ -117,6 +129,7 @@ function CodexPage({ user }) {
                 entry.universe,
                 entry.mode,
                 entry.faction,
+                entry.unit_type,
                 entry.abilitie,
                 entry.keywords,
                 rangeWeapons,
@@ -128,13 +141,19 @@ function CodexPage({ user }) {
 
             return haystack.includes(query);
         });
-    }, [allEntries, globalSearchTerm]);
+    }, [allEntries, globalSearchTerm, unitTypeFilter]);
+
+    const filteredEntries = useMemo(() => {
+        if (unitTypeFilter === 'all') return entries;
+        return entries.filter(entry => (entry.unit_type || 'other') === unitTypeFilter);
+    }, [entries, unitTypeFilter]);
 
     const startEdit = (entry) => {
         setEditingId(entry.id);
         setShowForm(true);
         setFormData({
             title: entry.title || '',
+            unit_type: entry.unit_type || 'other',
             range_weapons: parseWeapons(entry.range_weapons, entry.range_weapon ? [{
                 name: entry.range_weapon,
                 bonus: entry.range_bonus || '',
@@ -176,6 +195,7 @@ function CodexPage({ user }) {
                 universe,
                 mode,
                 faction,
+                unit_type: formData.unit_type || 'other',
                 range_weapons: (formData.range_weapons || []).map(normalizeWeapon),
                 melee_weapons: (formData.melee_weapons || []).map(normalizeWeapon),
                 abilitie: formData.abilitie,
@@ -255,6 +275,14 @@ function CodexPage({ user }) {
         content = (
             <div>
                 <h2>Index de {faction}</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                    <button type="button" onClick={() => setUnitTypeFilter('all')} style={{ padding: '6px 10px', fontWeight: unitTypeFilter === 'all' ? 'bold' : 'normal' }}>Tous</button>
+                    {UNIT_TYPES.map(t => (
+                        <button key={`index-filter-${t.key}`} type="button" onClick={() => setUnitTypeFilter(t.key)} style={{ padding: '6px 10px', fontWeight: unitTypeFilter === t.key ? 'bold' : 'normal' }}>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
                 {isAdmin && (
                     <div style={{ marginBottom: 16 }}>
                         <button onClick={() => { setShowForm(!showForm); setEditingId(null); }} style={{ padding: '8px 12px', marginRight: 8 }}>
@@ -270,6 +298,16 @@ function CodexPage({ user }) {
                                     required
                                     style={{ display: 'block', marginBottom: '10px', padding: '8px', width: '100%' }}
                                 />
+                                <label style={{ display: 'block', marginBottom: 6 }}>Type d'unite</label>
+                                <select
+                                    value={formData.unit_type}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, unit_type: e.target.value }))}
+                                    style={{ display: 'block', marginBottom: '10px', padding: '8px', width: '100%' }}
+                                >
+                                    {UNIT_TYPES.map(t => (
+                                        <option key={t.key} value={t.key}>{t.label}</option>
+                                    ))}
+                                </select>
                                 <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
                                     <div style={{ border: '1px solid #444', padding: 10, borderRadius: 6 }}>
                                         <strong style={{ display: 'block', marginBottom: 8 }}>Armes de tir</strong>
@@ -513,10 +551,11 @@ function CodexPage({ user }) {
                     </div>
                 )}
                 {loading ? <div>Chargement...</div> : error ? <div style={{ color: 'red' }}>{error}</div> : (
-                    entries.length === 0 ? <p>Aucun index trouvé.</p> : (
-                        entries.map(entry => (
+                    filteredEntries.length === 0 ? <p>Aucun index trouvé.</p> : (
+                        filteredEntries.map(entry => (
                             <div key={entry.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
                                 <h3>{entry.title}</h3>
+                                <p><strong>Type:</strong> {entry.unit_type || 'other'}</p>
                                 {entry.abilitie && <p><strong>Capacités:</strong> {entry.abilitie}</p>}
                                 {parseWeapons(entry.range_weapons, entry.range_weapon ? [{
                                     name: entry.range_weapon,
@@ -572,6 +611,14 @@ function CodexPage({ user }) {
             <h1>Codex</h1>
             <div style={{ marginBottom: 24, border: '1px solid #444', borderRadius: 6, padding: 12 }}>
                 <h2 style={{ marginTop: 0 }}>Recherche globale d'unite</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    <button type="button" onClick={() => setUnitTypeFilter('all')} style={{ padding: '6px 10px', fontWeight: unitTypeFilter === 'all' ? 'bold' : 'normal' }}>Tous</button>
+                    {UNIT_TYPES.map(t => (
+                        <button key={`global-filter-${t.key}`} type="button" onClick={() => setUnitTypeFilter(t.key)} style={{ padding: '6px 10px', fontWeight: unitTypeFilter === t.key ? 'bold' : 'normal' }}>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
                 <input
                     type="text"
                     placeholder="Tape un nom d'unite, faction, mot-cle..."
@@ -590,6 +637,7 @@ function CodexPage({ user }) {
                                 <p style={{ margin: '4px 0' }}>
                                     <strong>Univers:</strong> {entry.universe} | <strong>Mode:</strong> {entry.mode} | <strong>Faction:</strong> {entry.faction}
                                 </p>
+                                <p style={{ margin: '4px 0' }}><strong>Type:</strong> {entry.unit_type || 'other'}</p>
                                 {entry.abilitie && <p style={{ margin: '4px 0' }}><strong>Capacites:</strong> {entry.abilitie}</p>}
                                 {entry.keywords && <p style={{ margin: '4px 0' }}><strong>Mots-cles:</strong> {entry.keywords}</p>}
                             </div>
